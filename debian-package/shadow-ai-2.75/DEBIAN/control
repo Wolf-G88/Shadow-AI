@@ -1,0 +1,16 @@
+Package: shadow-ai
+Version: 2.75
+Section: utils
+Priority: optional
+Architecture: amd64
+Depends: python3 (>= 3.10), python3-venv, python3-pip, python3-tk, git, curl
+Maintainer: Wolf Clan <wolfking@shadowai.local>
+Description: Shadow AI v2.75 - private local assistant with hardened SILS runtime
+ Shadow AI is a privacy-first, local-first assistant with structured memory,
+ safer shell execution, file analysis, and SILS routing.
+ .
+ v2.75 highlights:
+ - Hardened SILS runtime path with template-backed intent handling
+ - Better local command safety and action review
+ - Improved memory, retrieval, and file handling
+ - Broader Linux source-install path and cleaner runtime behavior

@@ -1,0 +1,33 @@
+Shadow AI 2.75 for Windows
+==========================
+
+First launch
+------------
+1. Run run_windows.vbs or use the Start Menu/Desktop shortcut.
+2. If Python 3.10+ is not installed, Shadow will try to install Python 3.11 with winget.
+3. Shadow will create .venv-win and install the core Windows runtime.
+4. Your local Shadow data lives under:
+   %LOCALAPPDATA%\Shadow AI
+
+Included in this thin Windows package
+-------------------------------------
+- Shadow AI app source/runtime files
+- Shadow TinyLM model
+- tokenizer metadata
+
+Not included by default
+-----------------------
+- GGUF backend support via llama-cpp-python
+
+Add optional GGUF support later
+-------------------------------
+Open PowerShell in the Shadow AI folder and run:
+
+powershell -ExecutionPolicy Bypass -File .\install_windows.ps1 -InstallOptionalBackends
+
+Notes
+-----
+- The thin Windows build stays small by bootstrapping Python dependencies on first run.
+- run_windows.bat is kept as a debug fallback; normal Windows launch should use run_windows.vbs.
+- ShadowAI.ico is the packaged Windows icon used by the installer and shortcuts.
+- Ollama remains optional.

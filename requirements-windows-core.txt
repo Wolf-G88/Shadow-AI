@@ -1,0 +1,10 @@
+ollama
+pillow
+gitpython
+requests
+torch
+numpy
+tqdm
+python-dotenv
+psutil
+pynvml

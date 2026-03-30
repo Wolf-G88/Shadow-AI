@@ -1,0 +1,408 @@
+"""
+User Learning System
+Allows TinyLM to learn facts and preferences from user interactions.
+Stores per-user knowledge that augments the base knowledge base.
+"""
+
+import json
+from pathlib import Path
+from typing import Dict, List, Optional
+from datetime import datetime
+
+
+class UserLearning:
+    """
+    Learns from user interactions and stores personalized knowledge.
+    - User corrections ("Actually, X is Y")
+    - User preferences ("I prefer Z")
+    - Custom facts user teaches
+    """
+    
+    def __init__(self, user_id: str = "default", storage_dir: Optional[Path] = None):
+        self.user_id = user_id
+        
+        if storage_dir is None:
+            storage_dir = Path.home() / ".shadow-ai" / "user_learning"
+        
+        self.storage_dir = Path(storage_dir)
+        self.storage_dir.mkdir(parents=True, exist_ok=True)
+        
+        self.user_file = self.storage_dir / f"{user_id}_knowledge.json"
+        self.user_knowledge = self._load_knowledge()
+        
+        # Learning triggers - must be at start or very clear
+        self.correction_keywords = ["actually", "no that's", "that's wrong", "incorrect", "not quite", "that's not what"]
+        self.preference_keywords = ["i prefer", "i like", "i want", "my favorite"]
+        self.fact_keywords = ["remember that", "note that", "keep in mind", "learn this"]
+    
+    def _load_knowledge(self) -> Dict:
+        """Load user's learned knowledge from disk."""
+        if self.user_file.exists():
+            try:
+                with open(self.user_file, 'r') as f:
+                    return json.load(f)
+            except Exception as e:
+                print(f"[UserLearning] Error loading knowledge: {e}")
+                return self._init_knowledge()
+        return self._init_knowledge()
+    
+    def _init_knowledge(self) -> Dict:
+        """Initialize empty knowledge structure."""
+        return {
+            "user_id": self.user_id,
+            "created": datetime.now().isoformat(),
+            "last_updated": datetime.now().isoformat(),
+            "corrections": [],  # Facts user corrected
+            "preferences": [],  # User preferences
+            "custom_facts": [],  # Facts user explicitly taught
+            "topics": {},  # Learned facts organized by topic
+            "stats": {
+                "total_corrections": 0,
+                "total_preferences": 0,
+                "total_facts": 0
+            }
+        }
+    
+    def _save_knowledge(self):
+        """Save user knowledge to disk."""
+        try:
+            self.user_knowledge["last_updated"] = datetime.now().isoformat()
+            with open(self.user_file, 'w') as f:
+                json.dump(self.user_knowledge, f, indent=2)
+        except Exception as e:
+            print(f"[UserLearning] Error saving knowledge: {e}")
+    
+    def detect_learning_opportunity(self, user_input: str, shadow_response: str) -> Optional[str]:
+        """
+        Detect if user is trying to teach or correct.
+        More conservative to avoid false positives on normal questions.
+        
+        Returns:
+            Learning type: "correction", "preference", "fact", or None
+        """
+        user_lower = user_input.lower().strip()
+        
+        # Don't trigger on questions (they have question marks and question words)
+        if '?' in user_input:
+            # Exception: if it's clearly a correction despite having a ?
+            if any(phrase in user_lower for phrase in ["that's not", "that's wrong", "actually"]):
+                return "correction"
+            return None
+        
+        # Check for corrections - must be clear
+        if any(kw in user_lower for kw in self.correction_keywords):
+            return "correction"
+        
+        # Check for preferences - must start the sentence
+        if any(user_lower.startswith(kw) for kw in self.preference_keywords):
+            return "preference"
+        
+        # Check for explicit fact teaching
+        if any(kw in user_lower for kw in self.fact_keywords):
+            return "fact"
+        
+        return None
+    
+    def learn_correction(self, user_input: str, previous_response: str):
+        """Learn from user correction."""
+        correction = {
+            "timestamp": datetime.now().isoformat(),
+            "user_said": user_input,
+            "shadow_said": previous_response,
+            "type": "correction"
+        }
+        
+        self.user_knowledge["corrections"].append(correction)
+        self.user_knowledge["stats"]["total_corrections"] += 1
+        self._save_knowledge()
+        
+        print(f"[UserLearning] Learned correction from user", flush=True)
+        return "Got it. I'll remember that correction."
+    
+    def learn_preference(self, user_input: str):
+        """Learn user preference."""
+        preference = {
+            "timestamp": datetime.now().isoformat(),
+            "preference": user_input,
+            "type": "preference"
+        }
+        
+        self.user_knowledge["preferences"].append(preference)
+        self.user_knowledge["stats"]["total_preferences"] += 1
+        self._save_knowledge()
+        
+        print(f"[UserLearning] Learned preference from user", flush=True)
+        return "Noted. I'll remember your preference."
+    
+    def learn_fact(self, user_input: str, topic: Optional[str] = None):
+        """Learn custom fact from user."""
+        fact = {
+            "timestamp": datetime.now().isoformat(),
+            "fact": user_input,
+            "topic": topic or "general",
+            "type": "custom_fact"
+        }
+        
+        self.user_knowledge["custom_facts"].append(fact)
+        self.user_knowledge["stats"]["total_facts"] += 1
+        
+        # Organize by topic
+        topic_key = topic or "general"
+        if topic_key not in self.user_knowledge["topics"]:
+            self.user_knowledge["topics"][topic_key] = []
+        self.user_knowledge["topics"][topic_key].append(fact)
+        
+        self._save_knowledge()
+        
+        print(f"[UserLearning] Learned new fact from user", flush=True)
+        return "Thanks! I've added that to my knowledge base."
+    
+    def search_learned_knowledge(self, query: str) -> Optional[str]:
+        """
+        Search user's learned knowledge for relevant info.
+        For summary requests, provide topic overview instead of single fact.
+        
+        Returns:
+            Relevant learned fact or summary or None
+        """
+        query_lower = query.lower().strip()
+        
+        # Check if asking for summary - different types based on query
+        if ("what have" in query_lower or "what did" in query_lower) and len(query_lower.split()) <= 6:
+            return self._generate_summary("stats")
+        elif "summary" in query_lower or "summarize" in query_lower:
+            return self._generate_summary("detailed")
+        elif "overview" in query_lower:
+            return self._generate_summary("topics")
+        
+        # Search custom facts - return most relevant
+        matches = []
+        for fact in self.user_knowledge["custom_facts"]:
+            relevance = sum(1 for word in query_lower.split() if word in fact["fact"].lower())
+            if relevance > 0:
+                matches.append((relevance, fact["fact"], fact.get("source", "unknown")))
+        
+        if matches:
+            # Sort by relevance
+            matches.sort(reverse=True)
+            # Return top 3 matches
+            if len(matches) <= 3:
+                facts_text = "\n- ".join([f"{m[1]} (from {m[2]})" for m in matches])
+                return f"From what you taught me:\n- {facts_text}"
+            else:
+                facts_text = "\n- ".join([f"{m[1][:100]}... (from {m[2]})" for m in matches[:3]])
+                return f"Top matches from what you taught me:\n- {facts_text}\n\n(Found {len(matches)} total matches)"
+        
+        # Search preferences
+        for pref in self.user_knowledge["preferences"]:
+            if any(word in pref["preference"].lower() for word in query_lower.split()):
+                return f"Based on your preferences: {pref['preference']}"
+        
+        # Search corrections
+        for corr in self.user_knowledge["corrections"]:
+            if any(word in corr["user_said"].lower() for word in query_lower.split()):
+                return f"You corrected me before: {corr['user_said']}"
+        
+        return None
+    
+    def _generate_summary(self, summary_type: str = "topics") -> str:
+        """Generate different types of summaries.
+        
+        Args:
+            summary_type: "stats", "detailed", or "topics"
+        """
+        total = self.user_knowledge["stats"]["total_facts"]
+        num_topics = len(self.user_knowledge["topics"])
+        
+        if summary_type == "stats":
+            # Brief stats overview
+            lines = [f"I've learned {total:,} facts from you across {num_topics} topics."]
+            if self.user_knowledge["preferences"]:
+                lines.append(f"Plus {len(self.user_knowledge['preferences'])} preferences")
+            if self.user_knowledge["corrections"]:
+                lines.append(f"and {len(self.user_knowledge['corrections'])} corrections.")
+            return " ".join(lines)
+        
+        elif summary_type == "detailed":
+            # Detailed breakdown with sample facts
+            lines = [f"Learning Summary: {total:,} facts from {num_topics} documents\n"]
+            lines.append("Top 5 Topics:")
+            sorted_topics = sorted(self.user_knowledge["topics"].items(), 
+                                 key=lambda x: len(x[1]), reverse=True)[:5]
+            for topic, facts in sorted_topics:
+                lines.append(f"\n• {topic} ({len(facts)} facts)")
+                # Show first fact as sample
+                if facts:
+                    sample = facts[0]["fact"][:80]
+                    lines.append(f"  Sample: {sample}...")
+            
+            if num_topics > 5:
+                lines.append(f"\n...plus {num_topics - 5} more topics")
+            
+            return "\n".join(lines)
+        
+        else:  # topics
+            # Topic list overview
+            lines = [f"Knowledge Base: {total:,} facts across {num_topics} topics\n"]
+            lines.append("Topics by size:")
+            sorted_topics = sorted(self.user_knowledge["topics"].items(), 
+                                 key=lambda x: len(x[1]), reverse=True)[:15]
+            for topic, facts in sorted_topics:
+                lines.append(f"  • {topic}: {len(facts)} facts")
+            
+            if num_topics > 15:
+                lines.append(f"  ... and {num_topics - 15} more")
+            
+            return "\n".join(lines)
+    
+    def get_learning_stats(self) -> Dict:
+        """Get learning statistics."""
+        return {
+            "user_id": self.user_id,
+            "corrections": self.user_knowledge["stats"]["total_corrections"],
+            "preferences": self.user_knowledge["stats"]["total_preferences"],
+            "facts": self.user_knowledge["stats"]["total_facts"],
+            "total_learned": sum(self.user_knowledge["stats"].values()),
+            "last_updated": self.user_knowledge.get("last_updated", "Never")
+        }
+    
+    def clear_learned_knowledge(self):
+        """Clear all learned knowledge (reset)."""
+        self.user_knowledge = self._init_knowledge()
+        self._save_knowledge()
+        print(f"[UserLearning] Cleared all learned knowledge for {self.user_id}")
+    
+    def learn_from_text_batch(self, text: str, source: str = "batch_input") -> Dict:
+        """
+        Learn from large text input.
+        Extracts key phrases and concepts instead of raw sentences.
+        
+        Args:
+            text: Large text to learn from
+            source: Source identifier (e.g., filename)
+        
+        Returns:
+            Statistics about what was learned
+        """
+        import re
+        
+        # Better sentence splitting that handles code
+        # Split on periods, but not in code/numbers
+        sentences = re.split(r'(?<!\w\.\w.)(?<![A-Z][a-z]\.)(?<=\.|\!|\?)\s', text)
+        
+        # Also split on newlines for line-by-line content
+        lines = [l.strip() for l in text.split('\n') if l.strip()]
+        
+        # Combine both approaches
+        all_chunks = sentences + [l for l in lines if len(l.split()) >= 3]
+        
+        learned_count = 0
+        seen_facts = set()  # Avoid duplicates
+        
+        for chunk in all_chunks:
+            chunk = chunk.strip()
+            
+            # Skip very short, code-only, or symbol-heavy chunks
+            if len(chunk.split()) < 3:
+                continue
+            if len(chunk) > 500:  # Skip huge chunks
+                continue
+            
+            # Skip if mostly code/symbols
+            word_chars = sum(c.isalnum() or c.isspace() for c in chunk)
+            if word_chars / len(chunk) < 0.6:
+                continue
+            
+            # Skip duplicates
+            chunk_lower = chunk.lower()
+            if chunk_lower in seen_facts:
+                continue
+            seen_facts.add(chunk_lower)
+            
+            # Store as fact
+            fact = {
+                "timestamp": datetime.now().isoformat(),
+                "fact": chunk,
+                "topic": source,
+                "type": "batch_learned",
+                "source": source
+            }
+            
+            self.user_knowledge["custom_facts"].append(fact)
+            
+            # Organize by source
+            if source not in self.user_knowledge["topics"]:
+                self.user_knowledge["topics"][source] = []
+            self.user_knowledge["topics"][source].append(fact)
+            
+            learned_count += 1
+        
+        # Update stats
+        self.user_knowledge["stats"]["total_facts"] += learned_count
+        self._save_knowledge()
+        
+        print(f"[UserLearning] Learned {learned_count} facts from {source}", flush=True)
+        
+        return {
+            "sentences_learned": learned_count,
+            "source": source,
+            "total_facts": self.user_knowledge["stats"]["total_facts"]
+        }
+    
+    def learn_from_file(self, file_path: str) -> Dict:
+        """
+        Learn from text file.
+        
+        Args:
+            file_path: Path to text file
+        
+        Returns:
+            Statistics about what was learned
+        """
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                text = f.read()
+            
+            import os
+            source = os.path.basename(file_path)
+            return self.learn_from_text_batch(text, source)
+        except Exception as e:
+            print(f"[UserLearning] Error reading file: {e}")
+            return {"error": str(e)}
+    
+    def search_by_topic(self, topic: str) -> List[str]:
+        """
+        Search facts by topic/source.
+        
+        Returns:
+            List of facts from that topic
+        """
+        if topic in self.user_knowledge["topics"]:
+            return [f["fact"] for f in self.user_knowledge["topics"][topic]]
+        return []
+    
+    def export_knowledge(self) -> str:
+        """Export learned knowledge as readable text."""
+        lines = [f"=== Learned Knowledge for {self.user_id} ===\n"]
+        
+        if self.user_knowledge["corrections"]:
+            lines.append("Corrections:")
+            for corr in self.user_knowledge["corrections"][-10:]:  # Last 10
+                lines.append(f"  - {corr['user_said']}")
+        
+        if self.user_knowledge["preferences"]:
+            lines.append("\nPreferences:")
+            for pref in self.user_knowledge["preferences"][-10:]:
+                lines.append(f"  - {pref['preference']}")
+        
+        if self.user_knowledge["custom_facts"]:
+            lines.append("\nCustom Facts:")
+            for fact in self.user_knowledge["custom_facts"][-10:]:
+                lines.append(f"  - {fact['fact']}")
+        
+        if self.user_knowledge["topics"]:
+            lines.append("\nTopics:")
+            for topic, facts in self.user_knowledge["topics"].items():
+                lines.append(f"  - {topic}: {len(facts)} facts")
+        
+        return "\n".join(lines)

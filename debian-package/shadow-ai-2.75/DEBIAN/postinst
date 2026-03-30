@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+APP_DIR="/opt/shadow-ai"
+
+echo "Configuring Shadow AI 2.75..."
+
+chmod +x /usr/bin/shadow-ai
+chmod +x "${APP_DIR}/run.sh" || true
+chmod +x "${APP_DIR}/install.sh" || true
+
+echo "Shadow AI 2.75 configured."
+echo "Launch with: shadow-ai"
+echo "First launch will bootstrap the local Python environment if needed."

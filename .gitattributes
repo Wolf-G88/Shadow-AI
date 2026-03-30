@@ -1,0 +1,46 @@
+# Shadow AI - Git Attributes for Cross-Platform Compatibility
+
+# Enforce LF line endings for shell scripts
+*.sh text eol=lf
+
+# Python files should use LF
+*.py text eol=lf
+
+# JSON files should use LF
+*.json text eol=lf
+
+# Markdown files should use LF
+*.md text eol=lf
+
+# Configuration files should use LF
+*.conf text eol=lf
+*.config text eol=lf
+*.ini text eol=lf
+
+# Binary files (don't convert)
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.svg binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+
+# Debian package files
+DEBIAN/control text eol=lf
+DEBIAN/postinst text eol=lf
+DEBIAN/prerm text eol=lf
+DEBIAN/postrm text eol=lf
+
+# Explicitly declare text files for consistent behavior across platforms
+*.txt text
+*.xml text
+*.yaml text
+*.yml text
+*.toml text
+
+# Ensure all shell scripts are executable
+*.sh merge=binary

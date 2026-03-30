@@ -1,0 +1,53 @@
+{
+  "embedding_dim": 256,
+  "intent_encoder": {
+    "type": "gru",
+    "layers": 2,
+    "hidden_size": 256,
+    "bidirectional": true
+  },
+  "tone_encoder": {
+    "type": "transformer",
+    "layers": 4,
+    "heads": 8,
+    "hidden_size": 384,
+    "ff_size": 1536
+  },
+  "fusion": {
+    "type": "gated",
+    "gate_dim": 384
+  },
+  "router": {
+    "command_keywords": ["open", "close", "delete", "create", "define", "set", "get", "show", "tell", "run", "execute", "configure"],
+    "hybrid_threshold": 0.4
+  },
+  "personalization": {
+    "enabled": true,
+    "style_dim": 64,
+    "ema_alpha": 0.85
+  },
+  "training": {
+    "batch_size": 16,
+    "lr": 0.0003,
+    "weight_decay": 0.01,
+    "max_steps": 600,
+    "warmup_steps": 60,
+    "gradient_clip": 1.0,
+    "cleanup_boost": 1,
+    "max_cleanup_repeats": 4,
+    "save_every": 200,
+    "eval_every": 0
+  },
+  "tokenizer": {
+    "type": "wordpiece",
+    "vocab_size": 840,
+    "min_frequency": 1,
+    "special_tokens": ["<PAD>", "<UNK>", "<BOS>", "<EOS>", "<STYLE>", "<INTENT>"]
+  },
+  "generation": {
+    "max_length": 100,
+    "temperature": 0.7,
+    "top_k": 50,
+    "top_p": 0.9
+  }
+}

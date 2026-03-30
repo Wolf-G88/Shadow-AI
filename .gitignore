@@ -1,0 +1,53 @@
+# Virtual environments
+venv/
+.venv/
+.venv-win/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# Local user/runtime data
+data/memory.json
+data/*.sqlite*
+.shadow_ai_config.json
+.tmp-home*/
+_tmp_sils_eval_smoke.json
+torch
+
+# Build and release artifacts
+*.egg-info/
+dist/
+build/
+*.deb
+shadow-ai-*.deb
+debian-package/*.deb
+debian-package/.build/
+
+# Legacy package snapshots kept locally for reference
+debian-package/INSTALL_v2.0.2.md
+debian-package/RELEASE_NOTES_v2.0.2.md
+debian-package/RELEASE_NOTES_v2.0.35.md
+debian-package/RELEASE_NOTES_v2.0.36.md
+debian-package/shadow-ai-2.0.1/
+debian-package/shadow-ai-2.0.2/
+debian-package/shadow-ai-2.0.35/
+debian-package/shadow-ai-2.0.36/
+debian-package/shadow-ai-2.50/
+
+# Training outputs and checkpoints
+training/runtime_*/
+training/*.pt
+Shadow training/output*/
+Shadow training/*.pt
+
+# IDE / OS
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo

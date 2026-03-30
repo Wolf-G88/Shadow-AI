@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Shadow AI
+Comment=Private local AI assistant
+Exec=/usr/bin/shadow-ai
+Icon=shadow-ai
+Terminal=false
+Categories=Utility;Development;
+Keywords=AI;Assistant;Local;LLM;Privacy;
